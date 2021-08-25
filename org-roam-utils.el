@@ -276,19 +276,6 @@ If VAL is not specified, user is prompted to select a value."
       (org-delete-property prop))
     prop-to-remove))
 
-;;; Citations
-(defun org-roam-extract-citations (s)
-  "Extract citations from S. Assumes valid citation string."
-  (when (and (boundp org-element-citation-prefix-re)
-             (string-match org-element-citation-prefix-re s))
-    (let* ((start (match-end 0))
-           (closing (1- (length s)))
-           (citation-str (substring s start closing))
-           (citations (split-string citation-str ";")))
-      (mapcar (lambda (cite)
-                (substring (nth 0 (split-string cite " ")) 1))
-              citations))))
-
 ;;; Logs
 (defvar org-roam-verbose)
 (defun org-roam-message (format-string &rest args)
