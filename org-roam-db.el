@@ -284,13 +284,22 @@ If UPDATE-P is non-nil, first remove the file in the database."
          (dolist (fn fns)
            (funcall fn)))))))
 
-(defun org-roam-db-map-links (fns)
-  "Run FNS over all links in the current buffer."
+(defun org-roam-db-map-links (info fns)
+  "Run FNS over all links in the current buffer.
+INFO is the org-element parsed buffer."
   (org-with-point-at 1
-    (org-element-map (org-element-parse-buffer) 'link
+    (org-element-map info 'link
       (lambda (link)
         (dolist (fn fns)
           (funcall fn link))))))
+
+(defun org-roam-db-map-citations (info fns)
+  "Run FNS over all citations in the current buffer.
+INFO is the org-element parsed buffer."
+  (org-element-map info 'citation-reference
+      (lambda (cite)
+        (dolist (fn fns)
+          (funcall fn cite)))))
 
 (defun org-roam-db-insert-file-node ()
   "Insert the file-level node into the Org-roam cache."
@@ -445,6 +454,22 @@ If UPDATE-P is non-nil, first remove the file in the database."
                    (vector (point) source p type properties))
                  path))))))
 
+(defun org-roam-db-insert-citation (citation)
+  "Insert data for CITATION at current point into the Org-roam cache."
+  (save-excursion
+    (goto-char (org-element-property :begin citation))
+    (let ((type "cite")
+          (key (org-element-property :key citation))
+          (properties (list :outline (ignore-errors
+                                       ;; This can error if link is not under any headline
+                                       (org-get-outline-path 'with-self 'use-cache))))
+          (source (org-roam-id-at-point)))
+      (when (and source key)
+        (org-roam-db-query
+         [:insert :into links
+          :values $v1]
+         (vector (point) source key type properties))))))
+
 ;;;; Fetching
 (defun org-roam-db--get-current-files ()
   "Return a hash-table of file to the hash of its file contents."
@@ -476,7 +501,8 @@ If the file exists, update the cache with information."
   (setq file-path (or file-path (buffer-file-name (buffer-base-buffer))))
   (let ((content-hash (org-roam-db--file-hash file-path))
         (db-hash (caar (org-roam-db-query [:select hash :from files
-                                           :where (= file $s1)] file-path))))
+                                           :where (= file $s1)] file-path)))
+        info)
     (unless (string= content-hash db-hash)
       (org-roam-with-file file-path nil
         (save-excursion
@@ -491,8 +517,14 @@ If the file exists, update the cache with information."
                  #'org-roam-db-insert-tags
                  #'org-roam-db-insert-refs))
           (setq org-outline-path-cache nil)
+          (setq info (org-element-parse-buffer))
           (org-roam-db-map-links
-           (list #'org-roam-db-insert-link)))))))
+           info
+           (list #'org-roam-db-insert-link))
+          (when (require 'org-cite nil t)
+            (org-roam-db-map-citations
+             info
+             (list #'org-roam-db-insert-citation))))))))
 
 ;;;###autoload
 (defun org-roam-db-sync (&optional force)
