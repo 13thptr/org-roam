@@ -397,7 +397,7 @@ INFO is the org-element parsed buffer."
                                  (vector node-id (substring-no-properties tag))) tags))))
 
 (defun org-roam-db-insert-refs ()
-  "Insert REFS for node at point into Org-roam cache."
+  "Insert refs for node at point into Org-roam cache."
   (when-let* ((node-id (org-id-get))
               (refs (org-entry-get (point) "ROAM_REFS"))
               (refs (split-string-and-unquote refs)))
